@@ -1,0 +1,157 @@
+---
+title: "Point count formatting for BIOL314"
+format: pdf
+editor: visual
+knitr:
+  opts_chunk: 
+    root.dir: "/Users/aaronskinner/Library/CloudStorage/OneDrive-UBC/Grad_School/PhD/TA_LDP/BIOL314/Biol314_Spring2025_Repo/"
+    comment: "#>"
+    collapse: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Goal
+
+Data wrangling to get my bird point count data set into a format suitable for BIOL314, where we will do community biodiversity analyses.
+
+Load libraries
+
+```{r}
+#| label: Libraries
+#| message: false
+library(vegan) 
+library(tidyverse)
+library(janitor)
+library(xlsx)
+library(ggpubr)
+library(cowplot)
+ggplot2::theme_set(cowplot::theme_cowplot())
+```
+
+I am modeling my data formatting off of the stock datasets in vegan
+
+```{r}
+#| label: Vegan-datasets
+data(BCI) 
+data(BCI.env) 
+dim(BCI) # 50 plots, 225 species 
+dim(BCI.env) # 50 sites, 9 covs
+
+data(mite) 
+dim(mite) #70 sites, 35 species
+```
+
+## Create a reduced set of point counts for Biol 314 class
+
+### Site covariates
+
+I am starting with the site covariates as I'm pulling point counts within a single Ecoregion, by certain data collectors, and that have habitat covariate information available
+
+While not best practice, I'm uploading outputs from Rdata files that were created in another R project.
+
+```{r}
+#| label: upload-Rdata
+load("Rdata/Biol314_inputs_01.06.25.Rdata")
+```
+
+NOTE:: I've included the data collector CIPAV at present, but they followed a different methodology so it could make sense to remove them. I'd be interested in keeping them in though if possible!
+
+```{r}
+#| label: subset-ids
+ids <- Pc_hab %>% filter(Ecoregion == "Piedemonte" & Uniq_db %in% 
+                           c("Ubc mbd", "Cipav mbd", "Gaica mbd", "Gaica distancia")) %>% 
+  distinct(Id_muestreo, Habitat_cons) %>% # Habitat_cons = habitat consolidated 
+  filter(!is.na(Habitat_cons)) %>% 
+  arrange(Id_muestreo) %>%
+  pull(Id_muestreo) 
+length(ids)
+ids[1:6]
+```
+
+We have `r length(ids)` point counts that we'll include in the dataset.\
+\
+Covariates -- 1 row per point count
+
+```{r}
+#| label: site-covs
+Site_covs314 <- Site_covs_df %>% filter(Id_muestreo %in% ids) %>% 
+  arrange(Id_muestreo) 
+head(Site_covs314)
+
+#Export
+Site_covs314 %>% as.data.frame() %>% 
+  write.xlsx("Derived/Site_covs314.xlsx", row.names = F)
+```
+
+## Bird point count data
+
+**Methodology:** 10 minute 50m radius point counts\
+**Data sets included:** Ubc, CIPAV, Gaica MBD, and Gaica distancia for now
+
+```{r}
+#| label: Mean-counts-pivot
+
+# Define function for formatting col names
+Cap_snake <- function(df){
+  df <- df %>% clean_names(case = "snake")
+  names(df) <- str_to_sentence(names(df))
+  return(tibble(df))
+}
+
+Birds_wide <- Birds_fin %>% filter(Id_muestreo %in% ids) %>% 
+  distinct(Uniq_db, Id_muestreo, Nombre_ayerbe, Count) %>% 
+  reframe(Count_mn = round(mean(Count, na.rm = TRUE), digits = 0), 
+          .by = c(Id_muestreo, Nombre_ayerbe)) %>% 
+  pivot_wider(id_cols = Id_muestreo, names_from = Nombre_ayerbe, 
+              values_from = Count_mn, values_fill = 0) %>% 
+  Cap_snake() # Custom function
+dim(Birds_wide)
+```
+
+`r nrow(Birds_wide)` sites and `r ncol(Birds_wide)` species. Notice this is 2 fewer rows than in the `Site_covs314` data frame. There were no birds observed at these 2 point counts, but these 0s are valuable data. We need to add them back in and replace the NAs with 0s
+
+```{r}
+#| Label: Add-sites
+Meta314 <- Birds_wide %>% right_join(Site_covs314[c("Id_muestreo")]) %>%
+  mutate(across(everything(), ~ replace_na(., 0)))
+dim(Meta314) #Better!
+```
+
+## Summarize
+
+Summarize data in various ways
+
+```{r}
+#| label: Summary
+summary_meta <- Meta314 %>% rowwise() %>% 
+  mutate(Original_values = list(c_across(where(is.numeric))), # Cache original numeric values
+          Spp_obs = sum(Original_values > 0), 
+          Max_count = max(Original_values), 
+          N_zeros = sum(Original_values == 0), 
+          Tot_ind = sum(Original_values) ) %>% 
+  distinct(Id_muestreo, Spp_obs, Max_count, N_zeros, Tot_ind) %>% 
+  arrange(desc(Spp_obs)) %>% 
+  ungroup() 
+```
+
+Distribution of summary values (each row is a point count)
+
+```{r}
+#| label: Density-plots
+names <- c("Species observed", "Max count", "Number of zeros", "Total individuals")
+density_plots <- map2(.x = select(summary_meta, -Id_muestreo), .y = names, \(col, name){ 
+  ggplot(data = summary_meta, aes(x = col)) + 
+    geom_density() + 
+    labs(title = name, x = NULL) }) 
+ggpubr::ggarrange(density_plots[[1]], density_plots[[2]], 
+                  density_plots[[3]], density_plots[[4]])
+```
+
+Export bird Excel file
+
+```{r}
+#| Label: Export-excel
+Meta314 %>% arrange(Id_muestreo) %>% as.data.frame() %>% 
+  write.xlsx("Derived/Meta_314.xlsx", row.names = F)
+```
