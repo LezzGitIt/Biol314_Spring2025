@@ -1,13 +1,14 @@
 #BIOL/CONS 314
-#Lecture XX: caclulating phylogenetic community structure
-#Jonathan Davies 06/03/2025
+#Lecture XX: Caclulating phylogenetic community structure
+# Aaron Skinner 03/08/2025
 
-#install and load the libraries
+# Load libraries ----------------------------------------------------------
 library(ape)
 library(picante)
 
-#Example datasest in the Picante r package for illustrating calculations of
-# phylogenetic community structure (MPD and MNTD)
+# Phylogenetic community structure ----------------------------------------
+# >Example -----------------------------------------------------------------
+#Example datasest in the Picante r package for illustrating calculations of phylogenetic community structure (MPD and MNTD)
 
 #laod the data
 data(phylocom)
@@ -20,10 +21,10 @@ sp<-phylocom$sample
 
 #select the first site (row)
 site1<-sp[1,]
-#gete the names of the species NOT in the site (0 abundance)
+#get the names of the species NOT in the site (0 abundance)
 sp2<-site1[site1==0]
 
-#pune tht species for the tree NOT in the site
+#prune the species for the tree NOT in the site
 tree<-drop.tip(tree.phylocom, names(sp2))
 
 #calculate MPD and MNTD
@@ -39,30 +40,38 @@ mat.min<-apply(mat, 2, min, na.rm = T)
 my.mntd<-mean(mat.min)
 
 
-##############################################################################
-##############################################################################
-#Now lets try for the real forst plot data!
-##############################################################################
+# >Bird data--------------------------------------------------------------------
+# Bring in community data -- currently a dataframe
+Meta_birds <- read.xlsx("Derived/Meta_314.xlsx", sheetIndex = 1) %>% tibble()
+head(Meta_birds)
 
-#read in the community matrix
-x<-read.table("forest.data.txt", header = T)
+# Turn to matrix and transpose
+Birds_mat <- Meta_birds %>% column_to_rownames("Id_muestreo") %>% 
+  as.matrix()
+Birds_t <- Birds_mat %>% t()
 
-#read in the tree
-tree<-read.tree("forest.tre")
-plot(tree)
+## Phylogenetic tree
+# Set path to pull in inputs from primary R project
+path <- "/Users/aaronskinner/Library/CloudStorage/OneDrive-UBC/Grad_School/PhD/Analysis/Colombia-SCR-Rd3/Derived/"
 
-#extract data for site in column 4 (site LJ) 
-y<-(x[,4])
-names(y)<-x[,1]
+## Bring in single phylogenetic tree (BirdTree taxonomy) with just the species from my project 
+Birds_tree <- read.tree(paste0(path, "Single_tree.tre"))
 
-#get list of taxa NOT in the site (0 abundance)
+# Visualize phylogeny
+plot(Birds_tree)
+
+# Extract data for site in column 4 (`C-MB-M-C_03`)
+y <- Birds_t[,4]
+names(y)<- rownames(Birds_t)
+
+# Get list of taxa NOT in the site (0 abundance)
 z<-y[y==0]
 
-#prune the tree
-y.tree<-drop.tip(tree, names(z))
+# Prune the tree
+y.tree<-drop.tip(Meta_tree, names(z))
 plot(y.tree)
 
-#calculate MPD and MNTD
+## Calculate MPD and MNTD
 mat<-cophenetic(y.tree)
 dist.mat<-as.dist(mat)
 my.mpd<-mean(dist.mat)
@@ -72,14 +81,12 @@ mat.min<-apply(mat, 2, min, na.rm = T)
 my.mntd<-mean(mat.min)
 
 
-##############################################################################
-##############################################################################
-#Now lets calculate the Standard Effect Sizes (SES), also referred to as z-scores, again starting the phylocom data  
-##############################################################################
+# Standard Effect Sizes (SES) ---------------------------------------------
+#Now lets calculate the Standard Effect Sizes (SES), also referred to as z-scores
 
-library(picante)
+# >Example ---------------------------------------------------------------- 
+# Start with the phylocom data  
 
-data(phylocom)
 comm.tree<-phylocom$phylo
 comm.data<-phylocom$sample
 
@@ -104,37 +111,20 @@ boxplot(cbind(test.mpd$mpd.obs.z,test.abund.mpd$mpd.obs.z), names=c("MPD", "weig
 boxplot(cbind(test.mntd$mntd.obs.z,test.abund.mntd$mntd.obs.z), names=c("MNTD", "weighted MNTD"))
 
 
-##############################################################################
-##############################################################################
-#Your task is to calculate SES values for the Tiawanese forest plots
-##############################################################################
-
-library(picante)
-tree<-read.tree("forest.tre")
-
-x<-read.table("forest.data.txt", header = T, row.names = 1)
-#don't forget to transpose your matrix
-x.mat<-t(x)
-
-#The rest should be easy!
-
-###################################################
-###################################################
-###################################################
-###################################################
+# >Bird data --------------------------------------------------------------
 
 #calculate SES values for MPD and MNTD
-test.mpd<-ses.mpd(x.mat, cophenetic(tree),null.model="taxa.labels", iterations = 1000)
+test.mpd<-ses.mpd(Birds_mat, cophenetic(Birds_tree),null.model="taxa.labels", iterations = 1000)
 test.mpd
-test.mntd<-ses.mntd(x.mat, cophenetic(tree),null.model="taxa.labels", iterations = 1000)
+test.mntd<-ses.mntd(Birds_mat, cophenetic(Birds_tree),null.model="taxa.labels", iterations = 1000)
 test.mntd
 #generate a box plot for comparison
 boxplot(cbind(test.mpd$mpd.obs.z,test.mntd$mntd.obs.z), names=c("MPD", "MNTD"))
 
 #calculate SES values for MPD and MNTD weigting by abundance
-test.abund.mpd<-ses.mpd(x.mat, cophenetic(tree),null.model="taxa.labels", abundance.weighted=TRUE, iterations = 1000)
+test.abund.mpd<-ses.mpd(Birds_mat, cophenetic(Birds_tree),null.model="taxa.labels", abundance.weighted=TRUE, iterations = 1000)
 test.abund.mpd
-test.abund.mntd<-ses.mntd(x.mat, cophenetic(tree),null.model="taxa.labels", abundance.weighted=TRUE, iterations = 1000)
+test.abund.mntd<-ses.mntd(Birds_mat, cophenetic(Birds_tree),null.model="taxa.labels", abundance.weighted=TRUE, iterations = 1000)
 test.abund.mntd
 #generate a box plot for comparison
 boxplot(cbind(test.abund.mpd$mpd.obs.z,test.abund.mntd$mntd.obs.z), names=c("weighted MPD", "weighted MNTD"))
@@ -142,4 +132,3 @@ boxplot(cbind(test.abund.mpd$mpd.obs.z,test.abund.mntd$mntd.obs.z), names=c("wei
 #More boxplots:
 boxplot(cbind(test.mpd$mpd.obs.z,test.abund.mpd$mpd.obs.z), names=c("MPD", "weighted MPD"))
 boxplot(cbind(test.mntd$mntd.obs.z,test.abund.mntd$mntd.obs.z), names=c("MNTD", "weighted MNTD"))
-
