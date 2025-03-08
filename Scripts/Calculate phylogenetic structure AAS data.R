@@ -5,6 +5,8 @@
 # Load libraries ----------------------------------------------------------
 library(ape)
 library(picante)
+library(tidyverse)
+library(xlsx)
 
 # Phylogenetic community structure ----------------------------------------
 # >Example -----------------------------------------------------------------
@@ -51,11 +53,8 @@ Birds_mat <- Meta_birds %>% column_to_rownames("Id_muestreo") %>%
 Birds_t <- Birds_mat %>% t()
 
 ## Phylogenetic tree
-# Set path to pull in inputs from primary R project
-path <- "/Users/aaronskinner/Library/CloudStorage/OneDrive-UBC/Grad_School/PhD/Analysis/Colombia-SCR-Rd3/Derived/"
-
-## Bring in single phylogenetic tree (BirdTree taxonomy) with just the species from my project 
-Birds_tree <- read.tree(paste0(path, "Single_tree.tre"))
+# Bring in single phylogenetic tree (BirdTree taxonomy) with just the species from my project 
+Birds_tree <- read.tree("Derived/Meta_tree314.tre")
 
 # Visualize phylogeny
 plot(Birds_tree)
@@ -68,7 +67,7 @@ names(y)<- rownames(Birds_t)
 z<-y[y==0]
 
 # Prune the tree
-y.tree<-drop.tip(Meta_tree, names(z))
+y.tree<-drop.tip(Birds_tree, names(z))
 plot(y.tree)
 
 ## Calculate MPD and MNTD
@@ -79,7 +78,6 @@ my.mpd<-mean(dist.mat)
 mat[mat==0]<-NA
 mat.min<-apply(mat, 2, min, na.rm = T)
 my.mntd<-mean(mat.min)
-
 
 # Standard Effect Sizes (SES) ---------------------------------------------
 #Now lets calculate the Standard Effect Sizes (SES), also referred to as z-scores
@@ -109,7 +107,6 @@ boxplot(cbind(test.abund.mpd$mpd.obs.z,test.abund.mntd$mntd.obs.z), names=c("wei
 #More boxplots:
 boxplot(cbind(test.mpd$mpd.obs.z,test.abund.mpd$mpd.obs.z), names=c("MPD", "weighted MPD"))
 boxplot(cbind(test.mntd$mntd.obs.z,test.abund.mntd$mntd.obs.z), names=c("MNTD", "weighted MNTD"))
-
 
 # >Bird data --------------------------------------------------------------
 
