@@ -5,13 +5,13 @@
 # 2) Load in traits from Avonet 
 # 3) Subset both to just the species we observed in Meta
 
-
 # Libraries ---------------------------------------------------------------
 library(tidyverse)
 library(xlsx)
 library(phytools)
 library(ggtree)
 library(conflicted)
+ggplot2::theme_set(cowplot::theme_cowplot())
 conflicts_prefer(purrr::map)
 
 # Bring in data
@@ -56,7 +56,7 @@ Morphology_ft <- Spp_join_bt %>% select(-c(order_gbif, family_gbif)) %>%
   mutate(Species_bt = str_replace(Species_bt, " ", "_")) %>% 
   right_join(tibble(spp_obs), by = join_by("Species_bt" == "spp_obs")) %>% 
   slice_head(n = 1, by = Species_bt) %>% 
-  distinct(Species_bt, pick(c(7:17)))
+  distinct(Species_bt, pick(c(7:17), "Habitat"))
 
 # Export functional traits ------------------------------------------------
 Morphology_ft %>% as.data.frame() %>%
